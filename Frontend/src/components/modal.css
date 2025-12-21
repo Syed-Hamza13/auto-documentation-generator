@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 20, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  width: 420px;
+  background: linear-gradient(180deg, #12183a, #0b1022);
+  padding: 32px;
+  border-radius: 18px;
+  box-shadow: 0 0 40px rgba(124,124,255,0.4);
+}
+
+.modal h2 {
+  margin-bottom: 20px;
+}
+
+.modal input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  border: none;
+  background: #0e1430;
+  color: white;
+}
+
+.modal a {
+  color: var(--secondary);
+  font-size: 14px;
+  cursor: pointer;
+}
