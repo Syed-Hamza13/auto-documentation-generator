@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function SignupModal({ onClose, onSwitchToLogin }) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -19,14 +21,16 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Password match validation
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match!');
       return;
     }
 
-    // Add your signup logic here
     console.log('Signup attempt:', formData);
+    
+    // Simulate successful signup
+    navigate('/dashboard');
+    onClose();
   };
 
   return (

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function LoginModal({ onClose, onSwitchToSignup }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -9,6 +11,11 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
     e.preventDefault();
     // Add your login logic here
     console.log('Login attempt:', { email, password });
+    
+    // Simulate successful login
+    // Replace with actual authentication later
+    navigate('/dashboard');
+    onClose();
   };
 
   return (
