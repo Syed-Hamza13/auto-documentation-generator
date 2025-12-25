@@ -1,21 +1,36 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../db/client'; 
 
 export default function LoginModal({ onClose, onSwitchToSignup }) {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Add your login logic here
-    console.log('Login attempt:', { email, password });
-    
-    // Simulate successful login
-    // Replace with actual authentication later
-    navigate('/dashboard');
-    onClose();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      console.log('Login success data:', data);
+      alert('Login successful!');
+      navigate('/dashboard'); // ya jis page pe redirect chahiye
+      onClose();
+    } catch (err) {
+      console.error('Login error:', err.message);
+      alert(`Login failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,9 +90,14 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
 
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+              disabled={loading}
+              className={`w-full px-6 py-3 rounded-lg font-medium transition-all ${
+                loading
+                  ? 'bg-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25'
+              }`}
             >
-              Login
+              {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
 
