@@ -2,8 +2,7 @@ import React, { useState, useRef } from 'react';
 import { 
   Upload, Link2, FileText, Code2, Loader2, CheckCircle2, 
   X, ChevronRight, GitBranch, Clock, Sparkles, 
-  FileCode, Boxes, Network, Database, LogOut, Menu,
-  Download, Copy, ChevronLeft, FolderOpen, Calendar
+  FileCode, Boxes, Network, Database, LogOut, Menu
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -13,13 +12,10 @@ export default function Dashboard() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [showProjectsMenu, setShowProjectsMenu] = useState(false);
-  const [currentProject, setCurrentProject] = useState(null);
   const fileInputRef = useRef(null);
 
   const generationSteps = [
@@ -36,37 +32,6 @@ export default function Dashboard() {
     { id: 3, name: 'API Documentation', icon: <Code2 className="w-4 h-4" />, ready: true },
     { id: 4, name: 'Data Flow Analysis', icon: <Network className="w-4 h-4" />, ready: false },
     { id: 5, name: 'Dependency Analysis', icon: <Database className="w-4 h-4" />, ready: false }
-  ];
-
-  const previousProjects = [
-    { 
-      id: 1, 
-      name: 'E-commerce Platform', 
-      date: '2 days ago',
-      repo: 'github.com/user/ecommerce',
-      files: 5
-    },
-    { 
-      id: 2, 
-      name: 'Social Media App', 
-      date: '1 week ago',
-      repo: 'github.com/user/social-app',
-      files: 4
-    },
-    { 
-      id: 3, 
-      name: 'AI Chatbot System', 
-      date: '2 weeks ago',
-      repo: 'github.com/user/chatbot',
-      files: 6
-    },
-    { 
-      id: 4, 
-      name: 'Payment Gateway', 
-      date: '1 month ago',
-      repo: 'payment-system.zip',
-      files: 3
-    }
   ];
 
   const handleDragOver = (e) => {
@@ -89,16 +54,18 @@ export default function Dashboard() {
 
   const handleFileUpload = (file) => {
     setZipFile(file);
-    setRepoLink('');
+    setRepoLink(''); // Disable link input
     setIsUploading(true);
     setUploadProgress(0);
 
+    // Simulate upload progress
     const interval = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 100) {
           clearInterval(interval);
           setIsUploading(false);
-          showToastMessage('ZIP file uploaded successfully');
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
           return 100;
         }
         return prev + 10;
@@ -109,11 +76,10 @@ export default function Dashboard() {
   const handleLetsGo = () => {
     if (!repoLink && !zipFile) return;
     
-    const projectName = zipFile ? zipFile.name : repoLink.split('/').pop() || 'My Repository';
-    setCurrentProject({ name: projectName, source: zipFile ? zipFile.name : repoLink });
     setShowOverlay(false);
     setIsGenerating(true);
     
+    // Simulate generation process
     let step = 0;
     const stepInterval = setInterval(() => {
       step++;
@@ -126,19 +92,6 @@ export default function Dashboard() {
         }, 1000);
       }
     }, 2000);
-  };
-
-  const loadPreviousProject = (project) => {
-    setCurrentProject({ name: project.name, source: project.repo });
-    setShowProjectsMenu(false);
-    setSelectedDoc(documentationFiles[0]);
-    showToastMessage(`Loaded project: ${project.name}`);
-  };
-
-  const showToastMessage = (message) => {
-    setToastMessage(message);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
   };
 
   const isSubmitDisabled = !repoLink && !zipFile;
@@ -169,35 +122,21 @@ export default function Dashboard() {
         {!showOverlay && (
           <aside className="w-80 border-r border-purple-500/10 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Projects Menu Button */}
-              <button
-                onClick={() => setShowProjectsMenu(true)}
-                className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-purple-500/20 transition-all group"
-              >
-                <FolderOpen className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="flex-1 text-left font-medium">My Projects</span>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              {/* Current Project */}
               <div>
-                <h3 className="text-sm font-medium text-slate-400 mb-2">CURRENT PROJECT</h3>
+                <h3 className="text-sm font-medium text-slate-400 mb-2">PROJECT</h3>
                 <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-purple-500/20">
                   <div className="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
                     <GitBranch className="w-5 h-5 text-purple-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">
-                      {currentProject?.name || 'New Project'}
+                      {zipFile ? zipFile.name : repoLink.split('/').pop() || 'My Repository'}
                     </p>
-                    <p className="text-xs text-slate-400 truncate">
-                      {currentProject?.source || 'No source'}
-                    </p>
+                    <p className="text-xs text-slate-400">Documentation in progress</p>
                   </div>
                 </div>
               </div>
 
-              {/* Generated Docs */}
               <div>
                 <h3 className="text-sm font-medium text-slate-400 mb-3">GENERATED DOCS</h3>
                 <div className="space-y-2">
@@ -231,74 +170,12 @@ export default function Dashboard() {
           </aside>
         )}
 
-        {/* Projects Sidebar Menu - Animated */}
-        {showProjectsMenu && (
-          <>
-            {/* Backdrop */}
-            <div 
-              className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-40 animate-fade-in"
-              onClick={() => setShowProjectsMenu(false)}
-            ></div>
-            
-            {/* Sliding Panel */}
-            <div className="fixed left-0 top-20 bottom-0 w-80 bg-slate-900 border-r border-purple-500/20 z-50 shadow-2xl animate-slide-in-left overflow-y-auto">
-              <div className="p-6 space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-5 h-5 text-purple-400" />
-                    <h2 className="text-lg font-bold">My Projects</h2>
-                  </div>
-                  <button
-                    onClick={() => setShowProjectsMenu(false)}
-                    className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Projects List */}
-                <div className="space-y-3">
-                  {previousProjects.map((project) => (
-                    <button
-                      key={project.id}
-                      onClick={() => loadPreviousProject(project)}
-                      className="w-full p-4 bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700 hover:border-purple-500/30 transition-all text-left group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                          <GitBranch className="w-5 h-5 text-purple-400" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-medium mb-1 truncate">{project.name}</h3>
-                          <p className="text-xs text-slate-400 truncate mb-2">{project.repo}</p>
-                          <div className="flex items-center gap-3 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {project.date}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <FileText className="w-3 h-3" />
-                              {project.files} docs
-                            </span>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto">
           {isGenerating ? (
             <GeneratingView step={generationStep} steps={generationSteps} />
           ) : selectedDoc ? (
-            <DocumentViewer doc={selectedDoc} onToast={showToastMessage} />
+            <DocumentViewer doc={selectedDoc} />
           ) : !showOverlay ? (
             <EmptyState />
           ) : null}
@@ -420,12 +297,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* Success Toast */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-slide-up">
           <div className="bg-slate-900 border border-green-500/30 rounded-lg p-4 shadow-2xl flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <p className="text-sm font-medium">{toastMessage}</p>
+            <p className="text-sm font-medium">ZIP file uploaded successfully</p>
             <button onClick={() => setShowToast(false)} className="ml-2">
               <X className="w-4 h-4 text-slate-400 hover:text-white" />
             </button>
@@ -494,9 +371,7 @@ function GeneratingView({ step, steps }) {
   );
 }
 
-function DocumentViewer({ doc, onToast }) {
-  const contentRef = useRef(null);
-
+function DocumentViewer({ doc }) {
   const sampleContent = {
     'README.md': `# AI Doc Gen Project
 
@@ -559,64 +434,22 @@ GET /api/generate/:id/result
 \`\`\``
   };
 
-  const handleCopy = () => {
-    const content = sampleContent[doc.name] || 'Content not available';
-    navigator.clipboard.writeText(content);
-    onToast('Content copied to clipboard!');
-  };
-
-  const handleDownload = () => {
-    const content = sampleContent[doc.name] || 'Content not available';
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${doc.name.replace(/\s+/g, '_')}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    onToast(`${doc.name} downloaded successfully!`);
-  };
-
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="space-y-6">
-        {/* Header with Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
-              {doc.icon}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold">{doc.name}</h1>
-              <p className="text-sm text-slate-400">Generated by AI Doc Gen</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+            {doc.icon}
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-purple-500/30 rounded-lg transition-all group"
-            >
-              <Copy className="w-4 h-4 group-hover:text-purple-400 transition-colors" />
-              <span className="text-sm">Copy</span>
-            </button>
-            <button
-              onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 rounded-lg transition-all group"
-            >
-              <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span className="text-sm">Download</span>
-            </button>
+          <div>
+            <h1 className="text-2xl font-bold">{doc.name}</h1>
+            <p className="text-sm text-slate-400">Generated by AI Doc Gen</p>
           </div>
         </div>
 
-        {/* Content */}
         <div className="bg-slate-900/50 backdrop-blur-sm border border-purple-500/10 rounded-2xl p-8">
           <div className="prose prose-invert max-w-none">
-            <pre ref={contentRef} className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">
+            <pre className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">
               {sampleContent[doc.name] || 'Content loading...'}
             </pre>
           </div>
