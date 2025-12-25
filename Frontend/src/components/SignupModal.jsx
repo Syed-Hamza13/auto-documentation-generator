@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../db/client'; // Supabase client import
 
 export default function SignupModal({ onClose, onSwitchToLogin }) {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
     password: '',
     confirmPassword: ''
   });
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -18,19 +20,38 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match!');
       return;
     }
 
-    console.log('Signup attempt:', formData);
-    
-    // Simulate successful signup
-    navigate('/dashboard');
-    onClose();
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      alert('Signup successful! Please check your email to confirm your account.');
+      onClose();
+      navigate('/dashboard'); // ya login page
+    } catch (err) {
+      console.error('Error signing up:', err.message);
+      alert(`Signup failed: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,9 +129,14 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
 
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+              disabled={loading}
+              className={`w-full px-6 py-3 rounded-lg font-medium transition-all ${
+                loading
+                  ? 'bg-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25'
+              }`}
             >
-              Create Account
+              {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
