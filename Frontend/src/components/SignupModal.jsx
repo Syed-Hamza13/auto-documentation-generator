@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { signup } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function SignupModal({ onClose, onSwitchToLogin }) {
   const navigate = useNavigate();
+  const { setUser } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     password: '',
     confirmPassword: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -18,19 +23,41 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      setError('Passwords do not match!');
       return;
     }
 
-    console.log('Signup attempt:', formData);
-    
-    // Simulate successful signup
-    navigate('/dashboard');
-    onClose();
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await signup(
+        formData.fullName,
+        formData.email,
+        formData.password
+      );
+      
+      // Update global auth state
+      setUser(result.user);
+      
+      // Close modal and navigate to dashboard
+      onClose();
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Signup failed. Please try again.');
+      console.error('Signup error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -53,6 +80,12 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
             <p className="text-slate-400">Start generating docs in minutes</p>
           </div>
 
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Full Name</label>
@@ -64,6 +97,7 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
                 placeholder="John Doe"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -77,6 +111,7 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
                 placeholder="you@example.com"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -90,6 +125,7 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
                 placeholder="••••••••"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -103,14 +139,23 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
                 placeholder="••••••••"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={isLoading}
               />
             </div>
 
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all"
+              disabled={isLoading}
+              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Create Account
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                'Create Account'
+              )}
             </button>
           </form>
 

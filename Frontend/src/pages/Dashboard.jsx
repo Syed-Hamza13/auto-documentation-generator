@@ -1,12 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Upload, Link2, FileText, Code2, Loader2, CheckCircle2, 
   X, ChevronRight, GitBranch, Clock, Sparkles, 
   FileCode, Boxes, Network, Database, LogOut, Menu,
   Download, Copy, ChevronLeft, FolderOpen, Calendar
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { createProject, getProjects } from '../services/api';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  
   const [showOverlay, setShowOverlay] = useState(true);
   const [repoLink, setRepoLink] = useState('');
   const [zipFile, setZipFile] = useState(null);
@@ -14,12 +20,15 @@ export default function Dashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showProjectsMenu, setShowProjectsMenu] = useState(false);
   const [currentProject, setCurrentProject] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const fileInputRef = useRef(null);
 
   const generationSteps = [
@@ -37,6 +46,129 @@ export default function Dashboard() {
     { id: 4, name: 'Data Flow Analysis', icon: <Network className="w-4 h-4" />, ready: false },
     { id: 5, name: 'Dependency Analysis', icon: <Database className="w-4 h-4" />, ready: false }
   ];
+
+  // Load projects on mount
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const data = await getProjects();
+      setProjects(data.projects || []);
+      if (data.projects && data.projects.length > 0) {
+        setCurrentProject(data.projects[0]);
+      }
+    } catch (error) {
+      showToastMessage('Failed to load projects', 'error');
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  const showToastMessage = (message, type = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 4000);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/zip' && !file.name.endsWith('.zip')) {
+        showToastMessage('Please select a ZIP file', 'error');
+        return;
+      }
+      setZipFile(file);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && (file.type === 'application/zip' || file.name.endsWith('.zip'))) {
+      setZipFile(file);
+    } else {
+      showToastMessage('Please drop a ZIP file', 'error');
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!zipFile) {
+      showToastMessage('Please select a ZIP file', 'error');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('zipFile', zipFile);
+      formData.append('name', zipFile.name.replace('.zip', ''));
+
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + Math.random() * 30, 90));
+      }, 500);
+
+      const result = await createProject(formData);
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      // Add to projects list
+      if (result.project) {
+        setProjects([result.project, ...projects]);
+        setCurrentProject(result.project);
+        setZipFile(null);
+      }
+
+      showToastMessage('Project uploaded successfully!', 'success');
+
+      // Start generating docs
+      setTimeout(() => {
+        startGeneration();
+      }, 1000);
+    } catch (error) {
+      showToastMessage(error.message || 'Upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const startGeneration = async () => {
+    setIsGenerating(true);
+    setShowOverlay(false);
+
+    // Simulate generation steps
+    for (let i = 0; i < generationSteps.length; i++) {
+      setGenerationStep(i);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    setIsGenerating(false);
+    showToastMessage('Documentation generated successfully!', 'success');
+  };
 
   const previousProjects = [
     { 
@@ -69,43 +201,6 @@ export default function Dashboard() {
     }
   ];
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.zip')) {
-      handleFileUpload(file);
-    }
-  };
-
-  const handleFileUpload = (file) => {
-    setZipFile(file);
-    setRepoLink('');
-    setIsUploading(true);
-    setUploadProgress(0);
-
-    const interval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsUploading(false);
-          showToastMessage('ZIP file uploaded successfully');
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 200);
-  };
-
   const handleLetsGo = () => {
     if (!repoLink && !zipFile) return;
     
@@ -135,12 +230,6 @@ export default function Dashboard() {
     showToastMessage(`Loaded project: ${project.name}`);
   };
 
-  const showToastMessage = (message) => {
-    setToastMessage(message);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
-
   const isSubmitDisabled = !repoLink && !zipFile;
 
   return (
@@ -157,7 +246,11 @@ export default function Dashboard() {
             </span>
           </div>
           
-          <button className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-300 hover:text-white"
+            title="Logout"
+          >
             <LogOut className="w-5 h-5" />
           </button>
         </div>
