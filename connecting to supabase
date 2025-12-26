@@ -1,0 +1,19 @@
+Backend-API/
+├── .env
+├── .gitignore
+├── server.js
+├── config/
+│   └── supabase.js
+├── middleware/
+│   └── auth.js
+├── routes/
+│   ├── auth.js
+│   ├── projects.js
+│   └── documentation.js
+├── controllers/
+│   ├── authController.js
+│   ├── projectController.js
+│   └── documentationController.js
+├── utils/
+│   └── pythonRunner.js
+└── uploads/          (for ZIP files)
