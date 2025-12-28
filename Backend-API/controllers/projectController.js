@@ -6,6 +6,8 @@ const simpleGit = require('simple-git');
 const { v4: uuidv4 } = require('uuid');
 const extract = require('extract-zip');
 
+const STORAGE_BUCKET = 'documentation-files';
+
 exports.createProject = async (req, res) => {
   try {
     const { repoLink, repoType } = req.body;
@@ -37,16 +39,14 @@ exports.createProject = async (req, res) => {
         // Clean up uploaded ZIP file
         await fs.unlink(zipFile.path);
         
-        // Check if extraction created a subfolder (common in ZIP files)
+        // Check if extraction created a subfolder
         const extractedContents = await fs.readdir(localPath);
         
-        // If only one folder exists, use that as the repo root
         if (extractedContents.length === 1) {
           const potentialFolder = path.join(localPath, extractedContents[0]);
           const stat = await fs.stat(potentialFolder);
           
           if (stat.isDirectory()) {
-            // Update localPath to the actual project folder
             localPath = potentialFolder;
             console.log('Using subfolder as repo root:', localPath);
           }
@@ -106,7 +106,7 @@ exports.createProject = async (req, res) => {
     console.log('Project created in database:', project.id);
 
     // Start documentation generation in background
-    generateDocumentation(project.id, localPath);
+    generateDocumentation(project.id, localPath, userId);
 
     res.json({ 
       projectId: project.id,
@@ -118,7 +118,7 @@ exports.createProject = async (req, res) => {
   }
 };
 
-async function generateDocumentation(projectId, repoPath) {
+async function generateDocumentation(projectId, repoPath, userId) {
   try {
     console.log('Starting documentation generation for project:', projectId);
     console.log('Repository path:', repoPath);
@@ -130,7 +130,6 @@ async function generateDocumentation(projectId, repoPath) {
       .eq('id', projectId);
 
     console.log('Running Python analysis...');
-    // Run Python analysis
     await runPythonAnalysis(repoPath);
     console.log('Analysis completed successfully');
 
@@ -141,64 +140,11 @@ async function generateDocumentation(projectId, repoPath) {
       .eq('id', projectId);
 
     console.log('Running Python README generation...');
-    // Run Python README generation
     await runPythonGenerate(repoPath);
     console.log('README generation completed successfully');
 
-    // Read generated files
-    const docsPath = path.join(repoPath, '.ai', 'docs');
-    const readmePath = path.join(repoPath, 'README.md');
-
-    console.log('Reading generated documentation files...');
-    
-    // Check if docs folder exists
-    try {
-      const files = await fs.readdir(docsPath);
-      console.log('Found documentation files:', files);
-      
-      // Store documentation files in database
-      for (const file of files) {
-        if (file.endsWith('.md')) {
-          const filePath = path.join(docsPath, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-
-          await supabase
-            .from('documentation_files')
-            .insert([
-              {
-                project_id: projectId,
-                file_name: file.replace('.md', ''),
-                file_path: filePath,
-                file_type: 'analysis',
-                content
-              }
-            ]);
-          
-          console.log('Stored documentation file:', file);
-        }
-      }
-    } catch (err) {
-      console.error('Error reading docs folder:', err);
-    }
-
-    // Store README if exists
-    try {
-      const readmeContent = await fs.readFile(readmePath, 'utf-8');
-      await supabase
-        .from('documentation_files')
-        .insert([
-          {
-            project_id: projectId,
-            file_name: 'README',
-            file_path: readmePath,
-            file_type: 'readme',
-            content: readmeContent
-          }
-        ]);
-      console.log('Stored README file');
-    } catch (err) {
-      console.error('Error reading README:', err);
-    }
+    // Upload files to Supabase Storage and store references in database
+    await uploadDocumentationToStorage(projectId, repoPath, userId);
 
     // Update project status to completed
     await supabase
@@ -211,12 +157,143 @@ async function generateDocumentation(projectId, repoPath) {
 
     console.log('Documentation generation completed for project:', projectId);
 
+    // Clean up local repository files
+    console.log('Cleaning up local files...');
+    await cleanupLocalFiles(repoPath);
+    console.log('Local cleanup completed');
+
   } catch (error) {
     console.error('Documentation generation error:', error);
     await supabase
       .from('projects')
       .update({ status: 'failed' })
       .eq('id', projectId);
+    
+    // Try to cleanup even on failure
+    try {
+      await cleanupLocalFiles(repoPath);
+    } catch (cleanupError) {
+      console.error('Cleanup error:', cleanupError);
+    }
+  }
+}
+
+async function uploadDocumentationToStorage(projectId, repoPath, userId) {
+  try {
+    const docsPath = path.join(repoPath, '.ai', 'docs');
+    const readmePath = path.join(repoPath, 'README.md');
+
+    console.log('Uploading documentation files to Supabase Storage...');
+    
+    // Upload analysis files
+    try {
+      const files = await fs.readdir(docsPath);
+      console.log('Found documentation files:', files);
+      
+      for (const file of files) {
+        if (file.endsWith('.md')) {
+          const filePath = path.join(docsPath, file);
+          const fileContent = await fs.readFile(filePath);
+          
+          // Create unique storage path
+          const storagePath = `${userId}/${projectId}/analysis/${file}`;
+          
+          // Upload to Supabase Storage
+          const { data, error } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(storagePath, fileContent, {
+              contentType: 'text/markdown',
+              upsert: true
+            });
+
+          if (error) {
+            console.error('Upload error for', file, ':', error);
+            throw error;
+          }
+
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from(STORAGE_BUCKET)
+            .getPublicUrl(storagePath);
+
+          console.log('Uploaded:', file, '→', publicUrl);
+
+          // Store reference in database
+          await supabase
+            .from('documentation_files')
+            .insert([
+              {
+                project_id: projectId,
+                file_name: file.replace('.md', ''),
+                file_path: storagePath,
+                file_type: 'analysis',
+                storage_url: publicUrl
+              }
+            ]);
+        }
+      }
+    } catch (err) {
+      console.error('Error uploading docs folder:', err);
+    }
+
+    // Upload README
+    try {
+      const readmeContent = await fs.readFile(readmePath);
+      const storagePath = `${userId}/${projectId}/README.md`;
+      
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(storagePath, readmeContent, {
+          contentType: 'text/markdown',
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(storagePath);
+
+      console.log('Uploaded: README.md →', publicUrl);
+
+      await supabase
+        .from('documentation_files')
+        .insert([
+          {
+            project_id: projectId,
+            file_name: 'README',
+            file_path: storagePath,
+            file_type: 'readme',
+            storage_url: publicUrl
+          }
+        ]);
+    } catch (err) {
+      console.error('Error uploading README:', err);
+    }
+
+    console.log('All files uploaded to Supabase Storage successfully');
+  } catch (error) {
+    console.error('Storage upload error:', error);
+    throw error;
+  }
+}
+
+async function cleanupLocalFiles(repoPath) {
+  try {
+    // Get the parent directory (the one with userId_uuid format)
+    const parentPath = path.dirname(repoPath);
+    
+    // Check if this looks like our generated path
+    if (parentPath.includes(process.env.REPOS_STORAGE_PATH)) {
+      console.log('Deleting local repository:', parentPath);
+      await fs.rm(parentPath, { recursive: true, force: true });
+      console.log('Local repository deleted successfully');
+    } else {
+      console.log('Skipping cleanup - path does not match expected pattern');
+    }
+  } catch (error) {
+    console.error('Cleanup error:', error);
+    // Don't throw - cleanup failure shouldn't fail the whole process
   }
 }
 

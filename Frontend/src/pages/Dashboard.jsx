@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
 import { 
-  Upload, Link2, FileText, Code2, Loader2, CheckCircle2, 
+  Upload, Link2, FileText, Code2,  CheckCircle2, 
   X, ChevronRight, GitBranch, Sparkles, 
   FileCode, Boxes, Network, Database, LogOut,
   Download, Copy, ChevronLeft, FolderOpen, Calendar
@@ -527,13 +528,41 @@ function GeneratingView({ status }) {
 }
 
 function DocumentViewer({ doc, onToast }) {
+  const [content, setContent] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    loadContent();
+  }, [doc.id]);
+
+  const loadContent = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch content from Supabase Storage URL
+      if (doc.storage_url) {
+        const response = await fetch(doc.storage_url);
+        const text = await response.text();
+        setContent(text);
+      } else if (doc.content) {
+        // Fallback to content field if storage_url not available
+        setContent(doc.content);
+      }
+    } catch (error) {
+      console.error('Error loading content:', error);
+      onToast('Failed to load document content');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(doc.content || '');
+    navigator.clipboard.writeText(content);
     onToast('Content copied to clipboard!');
   };
 
   const handleDownload = () => {
-    const blob = new Blob([doc.content || ''], { type: 'text/markdown' });
+    const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -562,14 +591,16 @@ function DocumentViewer({ doc, onToast }) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-purple-500/30 rounded-lg transition-all group"
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-purple-500/30 rounded-lg transition-all group disabled:opacity-50"
             >
               <Copy className="w-4 h-4 group-hover:text-purple-400 transition-colors" />
               <span className="text-sm">Copy</span>
             </button>
             <button
               onClick={handleDownload}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 rounded-lg transition-all group"
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 rounded-lg transition-all group disabled:opacity-50"
             >
               <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-sm">Download</span>
@@ -579,9 +610,15 @@ function DocumentViewer({ doc, onToast }) {
 
         <div className="bg-slate-900/50 backdrop-blur-sm border border-purple-500/10 rounded-2xl p-8">
           <div className="prose prose-invert max-w-none">
-            <pre className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">
-              {doc.content || 'Content loading...'}
-            </pre>
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+              </div>
+            ) : (
+              <pre className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">
+                {content || 'Content not available'}
+              </pre>
+            )}
           </div>
         </div>
       </div>
