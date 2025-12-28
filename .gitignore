@@ -121,3 +121,4 @@ Thumbs.db
 .claude/
 .logs/
 logs/
+repos # Folder for cloned repositories
