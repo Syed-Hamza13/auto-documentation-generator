@@ -1,9 +1,11 @@
 const supabase = require('../config/supabase');
 const { runPythonAnalysis, runPythonGenerate } = require('../utils/pythonRunner');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const simpleGit = require('simple-git');
 const { v4: uuidv4 } = require('uuid');
+const AdmZip = require('adm-zip');
 
 exports.createProject = async (req, res) => {
   try {
@@ -17,11 +19,22 @@ exports.createProject = async (req, res) => {
       // Handle ZIP upload
       repoName = zipFile.originalname.replace('.zip', '');
       repoSource = zipFile.originalname;
-      localPath = path.join(process.env.REPOS_STORAGE_PATH, `${userId}_${uuidv4()}`);
+      const projectDir = path.join(process.env.REPOS_STORAGE_PATH, `${userId}_${uuidv4()}`);
       
-      // TODO: Extract ZIP to localPath
-      // For now, using uploads path
-      localPath = zipFile.path;
+      // Create project directory
+      await fs.mkdir(projectDir, { recursive: true });
+      
+      // Extract ZIP to project directory
+      try {
+        const zip = new AdmZip(zipFile.path);
+        zip.extractAllTo(projectDir, true);
+        console.log(`ZIP extracted successfully to ${projectDir}`);
+      } catch (unzipError) {
+        console.error('ZIP extraction failed:', unzipError);
+        throw new Error(`Failed to extract ZIP file: ${unzipError.message}`);
+      }
+      
+      localPath = projectDir;
     } else if (repoLink) {
       // Handle Git clone
       repoName = repoLink.split('/').pop().replace('.git', '');

@@ -5,15 +5,24 @@ const supabase = require('../config/supabase');
 exports.signup = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
+    console.log('Signup request:', { email });
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
 
     // Check if user exists
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: selectError } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
-      .single();
+      .eq('email', email);
 
-    if (existingUser) {
+    if (selectError) {
+      console.error('Select error:', selectError);
+      throw selectError;
+    }
+
+    if (existingUser && existingUser.length > 0) {
       return res.status(400).json({ error: 'User already exists' });
     }
 
@@ -26,18 +35,26 @@ exports.signup = async (req, res) => {
       .insert([
         {
           email,
-          full_name: fullName,
+          full_name: fullName || 'User',
           password_hash: passwordHash
         }
       ])
-      .select()
-      .single();
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
+
+    if (!newUser || newUser.length === 0) {
+      throw new Error('Failed to create user');
+    }
+
+    const user = newUser[0];
 
     // Generate JWT
     const token = jwt.sign(
-      { userId: newUser.id, email: newUser.email },
+      { userId: user.id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -45,14 +62,14 @@ exports.signup = async (req, res) => {
     res.json({
       token,
       user: {
-        id: newUser.id,
-        email: newUser.email,
-        fullName: newUser.full_name
+        id: user.id,
+        email: user.email,
+        fullName: user.full_name
       }
     });
   } catch (error) {
     console.error('Signup error:', error);
-    res.status(500).json({ error: 'Signup failed' });
+    res.status(500).json({ error: error.message || 'Signup failed' });
   }
 };
 

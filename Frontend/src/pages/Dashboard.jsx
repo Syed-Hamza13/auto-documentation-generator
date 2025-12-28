@@ -123,30 +123,53 @@ export default function Dashboard() {
     try {
       const formData = new FormData();
       formData.append('zipFile', zipFile);
-      formData.append('name', zipFile.name.replace('.zip', ''));
 
       // Simulate progress
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => Math.min(prev + Math.random() * 30, 90));
       }, 500);
 
-      const result = await createProject(formData);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
 
       clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // Add to projects list
-      if (result.project) {
-        setProjects([result.project, ...projects]);
-        setCurrentProject(result.project);
-        setZipFile(null);
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Upload failed');
       }
 
-      showToastMessage('Project uploaded successfully!', 'success');
+      const result = await response.json();
+      setUploadProgress(100);
+
+      // Create a new project object
+      const newProject = {
+        id: result.projectId,
+        name: zipFile.name.replace('.zip', ''),
+        repo_type: 'zip',
+        repo_source: zipFile.name,
+        status: 'analyzing',
+        created_at: new Date().toISOString(),
+        started_at: new Date().toISOString()
+      };
+
+      setProjects([newProject, ...projects]);
+      setCurrentProject(newProject);
+      setZipFile(null);
+
+      showToastMessage('Project uploaded successfully! Documentation generation started...', 'success');
 
       // Start generating docs
       setTimeout(() => {
         startGeneration();
+        // Poll for project status
+        pollProjectStatus(result.projectId);
       }, 1000);
     } catch (error) {
       showToastMessage(error.message || 'Upload failed', 'error');
@@ -168,6 +191,66 @@ export default function Dashboard() {
 
     setIsGenerating(false);
     showToastMessage('Documentation generated successfully!', 'success');
+  };
+
+  const handleFileUpload = (file) => {
+    if (file && (file.type === 'application/zip' || file.name.endsWith('.zip'))) {
+      setZipFile(file);
+      setRepoLink('');
+    } else {
+      showToastMessage('Please select a valid ZIP file', 'error');
+    }
+  };
+
+  const pollProjectStatus = async (projectId) => {
+    const maxAttempts = 60; // Poll for up to 10 minutes (60 * 10 seconds)
+    let attempts = 0;
+
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      try {
+        const token = localStorage.getItem('authToken');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/projects/${projectId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const project = result.project;
+
+          // Update current project status
+          setCurrentProject(project);
+
+          // Update projects list
+          setProjects(prevProjects =>
+            prevProjects.map(p => p.id === projectId ? project : p)
+          );
+
+          // Check if generation is complete
+          if (project.status === 'completed') {
+            showToastMessage('Documentation generated successfully!', 'success');
+            clearInterval(pollInterval);
+            return;
+          }
+
+          if (project.status === 'failed') {
+            showToastMessage(`Generation failed: ${project.error_message || 'Unknown error'}`, 'error');
+            clearInterval(pollInterval);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error polling project status:', error);
+      }
+
+      // Stop polling after max attempts
+      if (attempts >= maxAttempts) {
+        clearInterval(pollInterval);
+        showToastMessage('Documentation generation timed out', 'error');
+      }
+    }, 10000); // Poll every 10 seconds
   };
 
   const previousProjects = [
@@ -201,26 +284,73 @@ export default function Dashboard() {
     }
   ];
 
-  const handleLetsGo = () => {
+  const handleLetsGo = async () => {
     if (!repoLink && !zipFile) return;
     
-    const projectName = zipFile ? zipFile.name : repoLink.split('/').pop() || 'My Repository';
-    setCurrentProject({ name: projectName, source: zipFile ? zipFile.name : repoLink });
-    setShowOverlay(false);
-    setIsGenerating(true);
-    
-    let step = 0;
-    const stepInterval = setInterval(() => {
-      step++;
-      setGenerationStep(step);
-      if (step >= generationSteps.length) {
-        clearInterval(stepInterval);
-        setTimeout(() => {
-          setIsGenerating(false);
-          setSelectedDoc(documentationFiles[0]);
-        }, 1000);
+    try {
+      setIsUploading(true);
+      setShowOverlay(false);
+      setIsGenerating(true);
+      
+      const projectName = zipFile ? zipFile.name : repoLink.split('/').pop() || 'My Repository';
+      setCurrentProject({ name: projectName, source: zipFile ? zipFile.name : repoLink });
+
+      let response;
+      
+      if (zipFile) {
+        // Upload ZIP file
+        const formData = new FormData();
+        formData.append('zipFile', zipFile);
+        
+        const token = localStorage.getItem('authToken');
+        response = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        });
+      } else if (repoLink) {
+        // Clone from repository link
+        const token = localStorage.getItem('authToken');
+        response = await fetch(`${import.meta.env.VITE_API_URL}/projects`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ repoLink, repoType: 'github' })
+        });
       }
-    }, 2000);
+
+      const data = await response.json();
+      
+      if (response.ok && data.projectId) {
+        showToastMessage('Project created! Generating documentation...', 'success');
+        
+        // Simulate generation steps
+        let step = 0;
+        const stepInterval = setInterval(() => {
+          step++;
+          setGenerationStep(step);
+          if (step >= generationSteps.length) {
+            clearInterval(stepInterval);
+          }
+        }, 2000);
+
+        // Poll for actual project status
+        pollProjectStatus(data.projectId);
+      } else {
+        throw new Error(data.error || 'Failed to create project');
+      }
+    } catch (error) {
+      console.error('Error creating project:', error);
+      showToastMessage(`Error: ${error.message}`, 'error');
+      setIsGenerating(false);
+      setShowOverlay(true);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const loadPreviousProject = (project) => {
