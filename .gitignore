@@ -114,11 +114,7 @@ dmypy.json
 ehthumbs.db
 Thumbs.db
 
-======================================
-# PROJECT SPECIFIC
-======================================
-
 .claude/
 .logs/
 logs/
-repos # Folder for cloned repositories
+repos/* 
