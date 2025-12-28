@@ -17,3 +17,15 @@ Backend-API/
 ├── utils/
 │   └── pythonRunner.js
 └── uploads/          (for ZIP files)
+
+
+Frontend/src/
+├── services/
+│   ├── api.js           (NEW - API configuration)
+│   ├── authService.js   (NEW - Auth API calls)
+│   └── projectService.js (NEW - Project API calls)
+├── context/
+│   └── AuthContext.jsx  (NEW - Auth state management)
+├── utils/
+│   └── ProtectedRoute.jsx (NEW - Route protection)
+└── (existing files...)
