@@ -43,32 +43,47 @@ export default function LandingPage() {
   };
 
   // Upload handler
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      alert("Please select a file first!");
-      return;
-    }
+ const handleUpload = async () => {
+  if (!selectedFile) {
+    alert("Please select a file first!");
+    return;
+  }
 
-    setUploading(true);
-    const fileName = `${Date.now()}-${selectedFile.name}`;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase.storage
-      .from('gen-doc')
-      .upload(fileName, selectedFile);
+  if (!user) {
+    alert("Please login first");
+    return;
+  }
+  else{
+    console.log("user is not here")
+  }
 
-    setUploading(false);
+  setUploading(true);
 
-    if (error) {
-      console.error("Upload error:", error.message);
-      alert("File upload failed: " + error.message);
-    } else {
-      alert("File uploaded successfully!");
-      console.log("Uploaded file data:", data);
-      setSelectedFile(null);
-    }
-  };
+  const filePath = `${user.id}/${Date.now()}-${selectedFile.name}`;
 
-  return (
+  const { data, error } = await supabase.storage
+  .from('gen-doc')
+  .upload(filePath, selectedFile, {
+    contentType: selectedFile.type,
+    upsert: false,
+  });
+
+  setUploading(false);
+
+  if (error) {
+    console.error("Upload error:", error);
+    alert(error.message);
+  } else {
+    alert("File uploaded successfully!");
+    console.log("Uploaded:", data);
+    setSelectedFile(null);
+  }
+};
+ return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       {/* Header / Navbar */}
       <header className="fixed top-0 left-0 right-0 z-40 backdrop-blur-md bg-slate-950/80 border-b border-purple-500/10">
