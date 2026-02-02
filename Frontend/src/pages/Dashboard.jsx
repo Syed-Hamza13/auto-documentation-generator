@@ -5,6 +5,9 @@ import {
   X, ChevronRight, GitBranch, Sparkles, 
   FileCode, Boxes, Network, Database, LogOut,
   Download, Copy, ChevronLeft, FolderOpen, Calendar
+  Upload, Link2, FileText, Code2, Loader2, CheckCircle2, 
+  X, ChevronRight, GitBranch, Clock, Sparkles, 
+  FileCode, Boxes, Network, Database, LogOut, Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -108,6 +111,27 @@ export default function Dashboard() {
 
     setPollInterval(interval);
   };
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState(0);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const generationSteps = [
+    { icon: <GitBranch className="w-5 h-5" />, text: "Analyzing repository structure..." },
+    { icon: <Database className="w-5 h-5" />, text: "Extracting dependencies..." },
+    { icon: <Network className="w-5 h-5" />, text: "Mapping data flows..." },
+    { icon: <FileCode className="w-5 h-5" />, text: "Generating API documentation..." },
+    { icon: <Boxes className="w-5 h-5" />, text: "Creating architecture diagrams..." }
+  ];
+
+  const documentationFiles = [
+    { id: 1, name: 'README.md', icon: <FileText className="w-4 h-4" />, ready: true },
+    { id: 2, name: 'Architecture Overview', icon: <Boxes className="w-4 h-4" />, ready: true },
+    { id: 3, name: 'API Documentation', icon: <Code2 className="w-4 h-4" />, ready: true },
+    { id: 4, name: 'Data Flow Analysis', icon: <Network className="w-4 h-4" />, ready: false },
+    { id: 5, name: 'Dependency Analysis', icon: <Database className="w-4 h-4" />, ready: false }
+  ];
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -140,6 +164,44 @@ export default function Dashboard() {
         response = await projectService.createProjectWithZip(zipFile);
       } else {
         response = await projectService.createProjectWithLink(repoLink);
+  const handleFileUpload = (file) => {
+    setZipFile(file);
+    setRepoLink(''); // Disable link input
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    // Simulate upload progress
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsUploading(false);
+          setShowToast(true);
+          setTimeout(() => setShowToast(false), 3000);
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+  };
+
+  const handleLetsGo = () => {
+    if (!repoLink && !zipFile) return;
+    
+    setShowOverlay(false);
+    setIsGenerating(true);
+    
+    // Simulate generation process
+    let step = 0;
+    const stepInterval = setInterval(() => {
+      step++;
+      setGenerationStep(step);
+      if (step >= generationSteps.length) {
+        clearInterval(stepInterval);
+        setTimeout(() => {
+          setIsGenerating(false);
+          setSelectedDoc(documentationFiles[0]);
+        }, 1000);
       }
 
       showToastMessage('Project created! Documentation generation started.');
@@ -249,17 +311,6 @@ export default function Dashboard() {
         {!showOverlay && currentProject && (
           <aside className="w-80 border-r border-purple-500/10 bg-slate-900/50 backdrop-blur-sm overflow-y-auto">
             <div className="p-6 space-y-6">
-              {/* Projects Menu Button */}
-              <button
-                onClick={() => setShowProjectsMenu(true)}
-                className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-purple-500/20 transition-all group"
-              >
-                <FolderOpen className="w-5 h-5 text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="flex-1 text-left font-medium">My Projects</span>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              {/* Current Project */}
               <div>
                 <h3 className="text-sm font-medium text-slate-400 mb-2">CURRENT PROJECT</h3>
                 <div className="p-3 bg-slate-800/50 rounded-lg border border-purple-500/20">
@@ -274,11 +325,20 @@ export default function Dashboard() {
                         {getStatusText(currentProject.status)}
                       </p>
                     </div>
+                <h3 className="text-sm font-medium text-slate-400 mb-2">PROJECT</h3>
+                <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-purple-500/20">
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-lg flex items-center justify-center">
+                    <GitBranch className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">
+                      {zipFile ? zipFile.name : repoLink.split('/').pop() || 'My Repository'}
+                    </p>
+                    <p className="text-xs text-slate-400">Documentation in progress</p>
                   </div>
                 </div>
               </div>
 
-              {/* Generated Docs */}
               <div>
                 <h3 className="text-sm font-medium text-slate-400 mb-3">GENERATED DOCS</h3>
                 <div className="space-y-2">
@@ -379,6 +439,13 @@ export default function Dashboard() {
           ) : currentProject && (currentProject.status === 'analyzing' || currentProject.status === 'generating') ? (
             <GeneratingView status={currentProject.status} />
           ) : !showOverlay && currentProject ? (
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto">
+          {isGenerating ? (
+            <GeneratingView step={generationStep} steps={generationSteps} />
+          ) : selectedDoc ? (
+            <DocumentViewer doc={selectedDoc} />
+          ) : !showOverlay ? (
             <EmptyState />
           ) : null}
         </main>
@@ -495,11 +562,12 @@ export default function Dashboard() {
       )}
 
       {/* Toast */}
+      {/* Success Toast */}
       {showToast && (
         <div className="fixed bottom-6 right-6 z-50 animate-slide-up">
           <div className="bg-slate-900 border border-green-500/30 rounded-lg p-4 shadow-2xl flex items-center gap-3">
             <CheckCircle2 className="w-5 h-5 text-green-400" />
-            <p className="text-sm font-medium">{toastMessage}</p>
+            <p className="text-sm font-medium">ZIP file uploaded successfully</p>
             <button onClick={() => setShowToast(false)} className="ml-2">
               <X className="w-4 h-4 text-slate-400 hover:text-white" />
             </button>
@@ -605,6 +673,79 @@ function DocumentViewer({ doc, onToast }) {
               <Download className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span className="text-sm">Download</span>
             </button>
+function DocumentViewer({ doc }) {
+  const sampleContent = {
+    'README.md': `# AI Doc Gen Project
+
+## Overview
+This project demonstrates an AI-powered documentation generation system.
+
+## Features
+- Automatic README generation
+- Architecture diagram creation
+- API documentation extraction
+- Dependency analysis
+
+## Installation
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
+
+## Usage
+Simply upload your repository and let AI handle the rest.`,
+    'Architecture Overview': `# System Architecture
+
+## High-Level Design
+The system follows a microservices architecture with the following components:
+
+### Frontend Layer
+- React-based user interface
+- Real-time WebSocket connections
+- State management with Context API
+
+### Backend Layer
+- Node.js API server
+- Python ML processing service
+- Redis caching layer
+
+### Data Layer
+- PostgreSQL for structured data
+- MongoDB for document storage
+- S3 for file storage`,
+    'API Documentation': `# API Reference
+
+## Authentication
+\`\`\`
+POST /api/auth/login
+POST /api/auth/register
+\`\`\`
+
+## Repository Management
+\`\`\`
+POST /api/repositories
+GET /api/repositories/:id
+DELETE /api/repositories/:id
+\`\`\`
+
+## Documentation Generation
+\`\`\`
+POST /api/generate
+GET /api/generate/:id/status
+GET /api/generate/:id/result
+\`\`\``
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-gradient-to-br from-purple-500/20 to-blue-500/20 rounded-xl flex items-center justify-center">
+            {doc.icon}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">{doc.name}</h1>
+            <p className="text-sm text-slate-400">Generated by AI Doc Gen</p>
           </div>
         </div>
 
@@ -619,6 +760,9 @@ function DocumentViewer({ doc, onToast }) {
                 {content || 'Content not available'}
               </pre>
             )}
+            <pre className="text-sm leading-relaxed whitespace-pre-wrap text-slate-300">
+              {sampleContent[doc.name] || 'Content loading...'}
+            </pre>
           </div>
         </div>
       </div>

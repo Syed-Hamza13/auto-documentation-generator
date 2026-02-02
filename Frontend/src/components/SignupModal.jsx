@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../db/client'; // Supabase client import
 
 export default function SignupModal({ onClose, onSwitchToLogin }) {
   const navigate = useNavigate();
@@ -46,6 +47,24 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
     } catch (err) {
       console.error('Signup error:', err);
       setError(err.response?.data?.error || 'Signup failed. Please try again.');
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.fullName
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      alert('Signup successful! Please check your email to confirm your account.');
+      onClose();
+      navigate('/dashboard'); // ya login page
+    } catch (err) {
+      console.error('Error signing up:', err.message);
+      alert(`Signup failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -149,6 +168,13 @@ export default function SignupModal({ onClose, onSwitchToLogin }) {
               ) : (
                 'Create Account'
               )}
+              className={`w-full px-6 py-3 rounded-lg font-medium transition-all ${
+                loading
+                  ? 'bg-gray-600 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25'
+              }`}
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
