@@ -1,13 +1,30 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { supabase } from '../db/client'; 
 
 export default function LoginModal({ onClose, onSwitchToSignup }) {
   const navigate = useNavigate();
+  const { login } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await login(email, password);
+      onClose();
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Login error:', err);
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,6 +70,12 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
             <p className="text-slate-400">Sign in to your account</p>
           </div>
 
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">Email</label>
@@ -63,6 +86,7 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
                 placeholder="you@example.com"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={loading}
               />
             </div>
 
@@ -75,12 +99,13 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
                 placeholder="••••••••"
                 className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 transition-colors text-white"
                 required
+                disabled={loading}
               />
             </div>
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="rounded" />
+                <input type="checkbox" className="rounded" disabled={loading} />
                 <span className="text-slate-400">Remember me</span>
               </label>
               <a href="#" className="text-purple-400 hover:text-purple-300">
@@ -91,6 +116,16 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
             <button
               type="submit"
               disabled={loading}
+              className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Logging in...
+                </>
+              ) : (
+                'Login'
+              )}
               className={`w-full px-6 py-3 rounded-lg font-medium transition-all ${
                 loading
                   ? 'bg-gray-600 cursor-not-allowed'
@@ -106,6 +141,7 @@ export default function LoginModal({ onClose, onSwitchToSignup }) {
             <button
               onClick={onSwitchToSignup}
               className="text-purple-400 hover:text-purple-300 font-medium"
+              disabled={loading}
             >
               Sign up
             </button>
