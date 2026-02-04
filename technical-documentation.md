@@ -1632,5 +1632,3 @@ REPOS_STORAGE_PATH=D:/Projects/auto-documentation-generator/repos
 ## Document Version
 - **Version**: 1.0
 - **Last Updated**: February 4, 2025
-- **Author**: Technical Documentation
-- **Project**: AI Doc Gen
